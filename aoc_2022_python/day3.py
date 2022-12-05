@@ -1,4 +1,4 @@
-import pathlib
+from aoc import input_fpath_for_day
 
 
 def get_shared_item(rucksack):
@@ -41,8 +41,7 @@ def part_2(content):
 
 
 if __name__ == "__main__":
-    input_fpath = pathlib.Path(__file__).parent / ".." / "inputs" / "day3.txt"
-    with input_fpath.open() as f:
+    with input_fpath_for_day(3).open() as f:
         content = """vJrwpWtwJgWrhcsFMMfFFhFp
 jqHRNqRjqzjGDLGLrsFMfFZSrLrFZsSL
 PmmdzqPrVvPwwTWBwg

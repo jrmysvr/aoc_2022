@@ -1,4 +1,4 @@
-import pathlib
+from aoc import input_fpath_for_day
 
 
 def string_to_range(string):
@@ -30,8 +30,7 @@ def part_2(input_lines):
 
 
 if __name__ == "__main__":
-    input_fpath = pathlib.Path(__file__).parent / ".." / "inputs" / "day4.txt"
-    with input_fpath.open() as f:
+    with input_fpath_for_day(4).open() as f:
         content = f.read().strip().splitlines()
         print("Day 4")
         print("Part 1:", part_1(content))

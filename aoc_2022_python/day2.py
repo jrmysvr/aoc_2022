@@ -1,4 +1,4 @@
-import pathlib
+from aoc import input_fpath_for_day
 
 
 def calc_shape_score_from(me):
@@ -59,8 +59,7 @@ def score_round_part_2(round_tup):
 
 
 if __name__ == "__main__":
-    input_fpath = pathlib.Path(__file__).parent / ".." / "inputs" / "day2.txt"
-    with input_fpath.open() as f:
+    with input_fpath_for_day(2).open() as f:
         content = f.read().splitlines()
         print("Day 2")
         print("Part 1:", sum(map(score_round, map(str.split, content))))

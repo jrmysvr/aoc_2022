@@ -1,4 +1,5 @@
-import pathlib
+from aoc import input_fpath_for_day
+
 import re
 
 
@@ -70,8 +71,7 @@ def part_2(puzzle_input):
 
 
 if __name__ == "__main__":
-    input_fpath = pathlib.Path(__file__).parent / ".." / "inputs" / "day5.txt"
-    with input_fpath.open() as f:
+    with input_fpath_for_day(5).open() as f:
         content = """
     [D]
 [N] [C]
