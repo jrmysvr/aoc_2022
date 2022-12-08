@@ -33,18 +33,32 @@ def print_fs(fs: dict, space=""):
 
 
 def filter_sizes_under_value(sizes, value):
+    def lte(a, b):
+        return a <= b
+
+    return __filter_sizes_by_value(sizes, value, lte)
+
+
+def filter_sizes_over_value(sizes, value):
+    def gte(a, b):
+        return a >= b
+
+    return __filter_sizes_by_value(sizes, value, gte)
+
+
+def __filter_sizes_by_value(sizes, value, cmp):
     filtered = list()
     for (k, v) in sizes.items():
         if isinstance(v, dict):
-            filtered += filter_sizes_under_value(v, value)
+            filtered += __filter_sizes_by_value(v, value, cmp)
         else:
-            if v <= value:
+            if cmp(v, value):
                 filtered.append(v)
 
     return filtered
 
 
-def part_1(puzzle_input):
+def file_system_from_puzzle_input(puzzle_input):
     insts = parse_input(puzzle_input)
     parent = None
     fs = {"/": {"..": parent}}
@@ -69,13 +83,27 @@ def part_1(puzzle_input):
             fname = rest[-1]
             cwd[fname] = (fname, size)
 
-    #  print_fs(fs)
+    return fs
+
+
+def part_1(puzzle_input):
+    fs = file_system_from_puzzle_input(puzzle_input)
+    # print_fs(fs)
     sizes = calc_directory_sizes(fs["/"], "/")
     return sum(filter_sizes_under_value(sizes, 100000))
 
 
 def part_2(puzzle_input):
-    pass
+    fs = file_system_from_puzzle_input(puzzle_input)
+    sizes = calc_directory_sizes(fs["/"], "/")
+
+    total_used = sizes["/"]
+    disk_size = 70_000_000
+    desired_free_space = 30_000_000
+    unused_space = disk_size - total_used
+    space_to_free = desired_free_space - unused_space
+    dirs_to_delete = filter_sizes_over_value(sizes, space_to_free)
+    return min(dirs_to_delete)
 
 
 if __name__ == "__main__":
