@@ -4,6 +4,7 @@ pub mod day3;
 pub mod day4;
 pub mod day6;
 pub mod day8;
+pub mod day9;
 pub mod input;
 
 pub fn run_all() {
@@ -13,4 +14,5 @@ pub fn run_all() {
     day4::run();
     day6::run();
     day8::run();
+    day9::run();
 }
