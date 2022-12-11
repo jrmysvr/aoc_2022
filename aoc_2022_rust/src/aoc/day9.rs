@@ -4,7 +4,7 @@ pub fn run() {
     println!("Day 9");
     let puzzle_input = input::read_day(9);
     let movements = movements_from_puzzle_input(&puzzle_input);
-    let solution_part_1 = count_tail_positions_from(&movements);
+    let solution_part_1 = count_tail_positions_from(&movements, 1);
     let solution_part_2 = "";
     println!("Part 1: {}", solution_part_1);
     println!("Part 2: {}", solution_part_2);
@@ -43,10 +43,10 @@ fn move_tail_position_with(head_pos: &Pos, prev_head_pos: &Pos, tail_pos: &Pos) 
     let (hx, hy) = *head_pos;
     let (tx, ty) = *tail_pos;
     if (tx - hx).abs() <= 1 && (ty - hy).abs() <= 1 {
-        return *tail_pos;
+        *tail_pos
+    } else {
+        *prev_head_pos
     }
-
-    *prev_head_pos
 }
 
 fn move_position(head_pos: &Pos, tail_pos: &Pos, movement: &Movement) -> (Pos, Pos) {
@@ -80,7 +80,6 @@ fn submovements_from(movement: &Movement) -> Movements {
     submovements
 }
 
-/*
 fn visualize_positions(positions: &std::collections::HashSet<Pos>) {
     let min_x = positions.iter().map(|pos| pos.0).min().unwrap() - 1;
     let max_x = positions.iter().map(|pos| pos.0).max().unwrap() + 2;
@@ -99,21 +98,43 @@ fn visualize_positions(positions: &std::collections::HashSet<Pos>) {
         println!("");
     }
 }
-*/
 
-fn count_tail_positions_from(movements: &Movements) -> usize {
+type Rope = Vec<Pos>;
+
+fn count_tail_positions_from(movements: &Movements, rope_length: usize) -> usize {
     let mut head_pos = (0, 0);
+    let mut rope = Rope::new();
+    rope.push(head_pos);
+    for i in 1..=rope_length {
+        rope.push((0, 0));
+    }
     let mut tail_pos = (0, 0);
     let mut tail_positions = std::collections::HashSet::<Pos>::new();
     tail_positions.insert(tail_pos);
+    let mut next_head_pos = rope[1];
     for movement in movements {
         for submovement in submovements_from(&movement) {
-            (head_pos, tail_pos) = move_position(&head_pos, &tail_pos, &submovement);
+            (head_pos, next_head_pos) = move_position(&head_pos, &next_head_pos, &submovement);
+            let (hx, hy) = head_pos;
+            let mut prev_head_pos = (hx, hy);
+            rope[0] = head_pos;
+            rope[1] = next_head_pos;
+            prev_head_pos = head_pos;
+            tail_pos = next_head_pos;
+            for ix in 2..rope_length {
+                let next_tail_pos = rope[ix];
+                let new_tail_pos =
+                    move_tail_position_with(&next_head_pos, &prev_head_pos, &next_tail_pos);
+                tail_pos = new_tail_pos;
+                prev_head_pos = next_head_pos;
+                next_head_pos = new_tail_pos;
+                rope[ix] = new_tail_pos;
+            }
             tail_positions.insert(tail_pos);
         }
     }
 
-    // visualize_positions(&tail_positions);
+    visualize_positions(&tail_positions);
     tail_positions.len()
 }
 
@@ -136,12 +157,42 @@ U 24
 L 13
 D 11";
 
+    const TEST_CONTENT_3: &str = "\
+R 5
+U 8
+L 8
+D 3
+R 17
+D 10
+L 25
+U 20";
+
     fn test_content() -> String {
         String::from(TEST_CONTENT)
     }
 
     fn test_content_2() -> String {
         String::from(TEST_CONTENT_2)
+    }
+
+    fn test_content_3() -> String {
+        String::from(TEST_CONTENT_3)
+    }
+
+    #[test]
+    fn test_count_tail_positions_rope_length_10() {
+        let movements = movements_from_puzzle_input(&test_content());
+        let rope_length = 10;
+        let n_tail_positions = count_tail_positions_from(&movements, rope_length);
+        assert_eq!(n_tail_positions, 1);
+    }
+
+    #[test]
+    fn test_count_tail_positions_larger_rope_length_10() {
+        let movements = movements_from_puzzle_input(&test_content_3());
+        let rope_length = 10;
+        let n_tail_positions = count_tail_positions_from(&movements, rope_length);
+        assert_eq!(n_tail_positions, 36);
     }
 
     #[test]
@@ -164,9 +215,10 @@ D 11";
     }
 
     #[test]
-    fn test_count_tail_positions() {
+    fn test_count_tail_positions_rope_length_1() {
         let movements = movements_from_puzzle_input(&test_content());
-        let n_tail_positions = count_tail_positions_from(&movements);
+        let rope_length = 1;
+        let n_tail_positions = count_tail_positions_from(&movements, rope_length);
         assert_eq!(n_tail_positions, 13);
     }
 
