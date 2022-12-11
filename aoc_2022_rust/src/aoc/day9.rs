@@ -21,10 +21,7 @@ fn direction_from(s: &str) -> Direction {
 }
 
 fn step_from(s: &str) -> NSteps {
-    s.chars()
-        .map(|c| c.to_digit(10).unwrap() as i64)
-        .nth(0)
-        .unwrap()
+    s.parse::<NSteps>().unwrap()
 }
 
 fn movement_from(mvnt: Vec<&str>) -> Movement {
@@ -45,7 +42,7 @@ type Pos = (Step, Step);
 fn move_tail_position_with(head_pos: &Pos, prev_head_pos: &Pos, tail_pos: &Pos) -> Pos {
     let (hx, hy) = *head_pos;
     let (tx, ty) = *tail_pos;
-    if (tx - hx).abs() == 1 && (ty - hy).abs() == 1 {
+    if (tx - hx).abs() <= 1 && (ty - hy).abs() <= 1 {
         return *tail_pos;
     }
 
@@ -83,19 +80,40 @@ fn submovements_from(movement: &Movement) -> Movements {
     submovements
 }
 
+/*
+fn visualize_positions(positions: &std::collections::HashSet<Pos>) {
+    let min_x = positions.iter().map(|pos| pos.0).min().unwrap() - 1;
+    let max_x = positions.iter().map(|pos| pos.0).max().unwrap() + 2;
+    let min_y = positions.iter().map(|pos| pos.1).min().unwrap() - 1;
+    let max_y = positions.iter().map(|pos| pos.1).max().unwrap() + 2;
+
+    for y in min_y..max_y {
+        for x in min_x..max_x {
+            let pos = (x, y);
+            if positions.contains(&pos) {
+                print!("#");
+            } else {
+                print!(".");
+            }
+        }
+        println!("");
+    }
+}
+*/
+
 fn count_tail_positions_from(movements: &Movements) -> usize {
     let mut head_pos = (0, 0);
     let mut tail_pos = (0, 0);
     let mut tail_positions = std::collections::HashSet::<Pos>::new();
+    tail_positions.insert(tail_pos);
     for movement in movements {
-        let submovements = submovements_from(&movement);
-        for submovement in submovements {
+        for submovement in submovements_from(&movement) {
             (head_pos, tail_pos) = move_position(&head_pos, &tail_pos, &submovement);
             tail_positions.insert(tail_pos);
         }
     }
 
-    println!("{tail_positions:?}");
+    // visualize_positions(&tail_positions);
     tail_positions.len()
 }
 
@@ -111,8 +129,26 @@ R 4
 D 1
 L 5
 R 2";
+
+    const TEST_CONTENT_2: &str = "\
+R 14
+U 24
+L 13
+D 11";
+
     fn test_content() -> String {
         String::from(TEST_CONTENT)
+    }
+
+    fn test_content_2() -> String {
+        String::from(TEST_CONTENT_2)
+    }
+
+    #[test]
+    fn test_parse_input_digits_gt_10() {
+        let movements = movements_from_puzzle_input(&test_content_2());
+        let expected = vec![('R', 14), ('U', 24), ('L', 13), ('D', 11)];
+        assert_eq!(Vec::from(&movements[..]), expected);
     }
 
     #[test]
@@ -138,27 +174,68 @@ R 2";
     fn test_move_head_and_tail_submovements() {
         let movements = movements_from_puzzle_input(&test_content());
         let expected_positions = vec![
-            ((4, 0), (3, 0)),
-            ((4, -4), (4, -3)),
-            ((1, -4), (2, -4)),
-            ((1, -3), (2, -4)),
-            ((5, -3), (4, -3)),
-            ((5, -2), (4, -3)),
-            ((0, -2), (1, -2)),
-            ((2, -2), (1, -2)),
+            // R 4
+            vec![
+                ((1, 0), (0, 0)),
+                ((2, 0), (1, 0)),
+                ((3, 0), (2, 0)),
+                ((4, 0), (3, 0)),
+            ],
+            // U 4
+            vec![
+                ((4, -1), (3, 0)),
+                ((4, -2), (4, -1)),
+                ((4, -3), (4, -2)),
+                ((4, -4), (4, -3)),
+            ],
+            // L 3
+            vec![((3, -4), (4, -3)), ((2, -4), (3, -4)), ((1, -4), (2, -4))],
+            // D 1
+            vec![((1, -3), (2, -4))],
+            // R 4
+            vec![
+                ((2, -3), (2, -4)),
+                ((3, -3), (2, -4)),
+                ((4, -3), (3, -3)),
+                ((5, -3), (4, -3)),
+            ],
+            // D 1
+            vec![((5, -2), (4, -3))],
+            // L 5
+            vec![
+                ((4, -2), (4, -3)),
+                ((3, -2), (4, -3)),
+                ((2, -2), (3, -2)),
+                ((1, -2), (2, -2)),
+                ((0, -2), (1, -2)),
+            ],
+            // R 2
+            vec![((1, -2), (1, -2)), ((2, -2), (1, -2))],
         ];
         let mut head_pos = (0, 0);
         let mut tail_pos = (0, 0);
-        for movement in movements {
-            for (submovement, expected_pos) in
-                submovements_from(&movement).iter().zip(expected_positions.iter())
+        for (movement, expected_pos) in movements.iter().zip(expected_positions.iter()) {
+            for (submovement, expected_sub_pos) in
+                submovements_from(&movement).iter().zip(expected_pos.iter())
             {
                 (head_pos, tail_pos) = move_position(&head_pos, &tail_pos, &submovement);
-                let (expected_head_pos, expected_tail_pos) = expected_pos;
-                assert_eq!(head_pos.0, expected_head_pos.0);
-                assert_eq!(head_pos.1, expected_head_pos.1);
-                assert_eq!(tail_pos.0, expected_tail_pos.0);
-                assert_eq!(tail_pos.1, expected_tail_pos.1);
+                let (expected_head_pos, expected_tail_pos) = expected_sub_pos;
+                assert_eq!(
+                    head_pos.0, expected_head_pos.0,
+                    "head position x - movement: {submovement:?} - expected pos: {expected_head_pos:?}"
+                );
+                assert_eq!(
+                    head_pos.1, expected_head_pos.1,
+                    "head position y - movement: {submovement:?} - expected pos: {expected_head_pos:?}"
+                );
+                assert_eq!(
+                    tail_pos.0, expected_tail_pos.0,
+                    "tail position x - movement: {submovement:?} - expected pos: {expected_tail_pos:?}"
+                );
+                assert_eq!(
+                    tail_pos.1, expected_tail_pos.1,
+                    "tail position y - movement: {submovement:?} - expected pos: {expected_tail_pos:?}"
+                );
             }
         }
     }
