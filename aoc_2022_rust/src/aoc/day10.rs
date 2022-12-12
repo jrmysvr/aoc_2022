@@ -5,18 +5,24 @@ pub fn run() {
     let puzzle_input = input::read_day(10);
     let instructions = instructions_from_puzzle_input(&puzzle_input);
     let solution_part_1 = part_1(&instructions);
-    let solution_part_2 = "";
+    let solution_part_2 = part_2(&instructions);
     println!("Part 1: {}", solution_part_1);
     println!("Part 2: {}", solution_part_2);
 }
 
-fn part_1(instructions: &Vec<Inst>) -> SignalStrength {
-    let mut circuit = ClockCircuit::new();
+fn part_1(instructions: &Instructions) -> SignalStrength {
+    let mut circuit = CPU::new();
     let cycle_filter = |tick| -> bool { tick == 20 || (tick - 20) % 40 == 0 };
 
     circuit.calc_signal_strength(&instructions, cycle_filter)
 }
 
+fn part_2(instructions: &Instructions) -> String {
+    let (width, height) = (40, 6);
+    let mut crt = CRT::new(width, height);
+    let screen = crt.run(&instructions);
+    crt.render(&screen)
+}
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum Op {
@@ -60,27 +66,21 @@ fn instructions_from_puzzle_input(puzzle_input: &String) -> Instructions {
 }
 
 type Tick = i64;
-type PlannedInst = std::collections::HashMap<Tick, Vec<Inst>>;
 type SignalStrength = V;
 
 #[derive(Debug)]
-struct ClockCircuit {
+struct CPU {
     tick: Tick,
     reg_x: V,
-    signal_strength: SignalStrength,
 }
 
-impl ClockCircuit {
+impl CPU {
     fn new() -> Self {
-        Self {
-            reg_x: 1,
-            tick: 0,
-            signal_strength: 0,
-        }
+        Self { reg_x: 1, tick: 0 }
     }
 
-    fn run(&mut self, instructions: &Vec<Inst>) -> Vec<ClockCircuit> {
-        let mut states = Vec::<ClockCircuit>::new();
+    fn run(&mut self, instructions: &Instructions) -> Vec<CPU> {
+        let mut states = Vec::<CPU>::new();
         for instruction in instructions {
             match instruction.0 {
                 Op::Addx => {
@@ -100,31 +100,111 @@ impl ClockCircuit {
         states
     }
 
-    fn signal_strength(&self) -> SignalStrength {
-        (self.tick as V) * self.reg_x
-    }
-
-    fn to_state(&self) -> ClockCircuit {
-        ClockCircuit {
+    fn to_state(&self) -> CPU {
+        CPU {
             tick: self.tick,
             reg_x: self.reg_x,
-            signal_strength: self.signal_strength(),
         }
     }
 
     fn calc_signal_strength(
         &mut self,
-        instructions: &Vec<Inst>,
+        instructions: &Instructions,
         cycle_filter: fn(Tick) -> bool,
     ) -> SignalStrength {
         let mut signal_strength = 0;
         for state in self.run(&instructions) {
             if cycle_filter(state.tick) {
-                signal_strength += state.signal_strength;
+                signal_strength += state.tick * state.reg_x;
             }
         }
 
         signal_strength
+    }
+}
+
+struct CRT {
+    tick: Tick,
+    reg_x: V,
+    width: usize,
+    height: usize,
+}
+
+type Pixel = char;
+type Row = Vec<Pixel>;
+type Screen = Vec<Row>;
+
+impl CRT {
+    fn new(width: usize, height: usize) -> Self {
+        Self {
+            reg_x: 1,
+            tick: 0,
+            width: width,
+            height: height,
+        }
+    }
+
+    fn new_screen(&self) -> Screen {
+        let mut screen = Screen::new();
+        for _ in 0..self.height {
+            let mut row = Row::new();
+            for _ in 0..self.width {
+                row.push(' ');
+            }
+            screen.push(row);
+        }
+
+        screen
+    }
+
+    fn run(&mut self, instructions: &Instructions) -> Screen {
+        let mut screen = self.new_screen();
+        for instruction in instructions {
+            match instruction.0 {
+                Op::Addx => {
+                    self.tick += 1;
+                    self.draw(&mut screen);
+                    self.tick += 1;
+                    self.draw(&mut screen);
+                    self.reg_x += instruction.1.unwrap();
+                }
+                Op::Noop => {
+                    self.tick += 1;
+                    self.draw(&mut screen);
+                }
+            }
+        }
+
+        screen
+    }
+
+    fn render(&self, screen: &Screen) -> String {
+        let mut rendering = String::new();
+        rendering.push('\n');
+        for row in screen {
+            for pixel in row {
+                rendering.push(*pixel);
+            }
+            rendering.push('\n');
+        }
+
+        rendering
+    }
+
+    fn draw(&self, screen: &mut Screen) {
+        let tick = (self.tick - 1) as usize;
+        let lit = '#';
+        let dark = ' ';
+        if tick < (self.width * self.height) {
+            let col = tick % self.width;
+            let row = tick / self.width;
+            let pixel = if (self.reg_x - 1 <= col as V) && (col as V <= self.reg_x + 1) {
+                lit
+            } else {
+                dark
+            };
+            screen[row][col] = pixel;
+        }
     }
 }
 
@@ -295,7 +375,7 @@ noop";
     #[test]
     fn test_signal_strength_for_cycles() {
         let instructions = instructions_from_puzzle_input(&test_content_2());
-        let mut circuit = ClockCircuit::new();
+        let mut circuit = CPU::new();
         let cycle_filter = |tick| -> bool { tick == 20 || (tick - 20) % 40 == 0 };
 
         let signal_strength = circuit.calc_signal_strength(&instructions, cycle_filter);
@@ -306,12 +386,12 @@ noop";
     #[test]
     fn test_larger_clock_program() {
         let instructions = instructions_from_puzzle_input(&test_content_2());
-        let mut circuit = ClockCircuit::new();
+        let mut circuit = CPU::new();
         let mut signal_strength: SignalStrength = 0;
         for state in circuit.run(&instructions) {
             if state.tick == 20 || (state.tick - 20) % 40 == 0 {
                 println!("{state:?}");
-                signal_strength += state.signal_strength;
+                signal_strength += state.tick * state.reg_x;
             }
         }
         assert_eq!(signal_strength, 13140);
@@ -320,7 +400,7 @@ noop";
     #[test]
     fn test_simple_clock_program() {
         let instructions = instructions_from_puzzle_input(&test_content());
-        let mut circuit = ClockCircuit::new();
+        let mut circuit = CPU::new();
         let _ = circuit.run(&instructions);
         assert_eq!(circuit.reg_x, -1);
         assert_eq!(circuit.tick, 5);
@@ -328,7 +408,7 @@ noop";
 
     #[test]
     fn test_noop_instruction() {
-        let mut circuit = ClockCircuit::new();
+        let mut circuit = CPU::new();
         circuit.run(&vec![Inst::noop()]);
         assert_eq!(circuit.tick, 1);
         assert_eq!(circuit.reg_x, 1);
