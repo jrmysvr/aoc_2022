@@ -2,18 +2,21 @@ use crate::aoc::input;
 
 pub fn run() {
     println!("Day 10");
-    //let _ = input::read_day(_);
-    //let _ = parse_input(_);
-    let solution_part_1 = "";
+    let puzzle_input = input::read_day(10);
+    let instructions = instructions_from_puzzle_input(&puzzle_input);
+    let solution_part_1 = part_1(&instructions);
     let solution_part_2 = "";
     println!("Part 1: {}", solution_part_1);
     println!("Part 2: {}", solution_part_2);
 }
 
-/*
-fn parse_input(content: String) -> _ {
+fn part_1(instructions: &Vec<Inst>) -> SignalStrength {
+    let mut circuit = ClockCircuit::new();
+    let cycle_filter = |tick| -> bool { tick == 20 || (tick - 20) % 40 == 0 };
+
+    circuit.calc_signal_strength(&instructions, cycle_filter)
 }
-*/
+
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 enum Op {
@@ -38,11 +41,11 @@ impl Inst {
 type Instructions = Vec<Inst>;
 
 fn instruction_from(line: &str) -> Inst {
-    let tokens = line.split(" ").collect::<Vec<&str>>();
+    let tokens = line.trim().split(" ").collect::<Vec<&str>>();
     let inst = match tokens[0] {
         "noop" => Inst(Op::Noop, None),
         "addx" => Inst(Op::Addx, Some(tokens[1].parse::<V>().unwrap())),
-        _ => panic!("Unsupport Instruction"),
+        _ => panic!("Unsupported Instruction: {tokens:?}"),
     };
 
     inst
@@ -50,63 +53,78 @@ fn instruction_from(line: &str) -> Inst {
 
 fn instructions_from_puzzle_input(puzzle_input: &String) -> Instructions {
     puzzle_input
+        .trim()
         .split('\n')
         .map(instruction_from)
         .collect::<Instructions>()
 }
 
 type Tick = i64;
-
 type PlannedInst = std::collections::HashMap<Tick, Vec<Inst>>;
+type SignalStrength = V;
 
 #[derive(Debug)]
 struct ClockCircuit {
-    reg_x: V,
     tick: Tick,
-    planned_inst: PlannedInst,
+    reg_x: V,
+    signal_strength: SignalStrength,
 }
-
-type SignalStrength = V;
 
 impl ClockCircuit {
     fn new() -> Self {
         Self {
             reg_x: 1,
             tick: 0,
-            planned_inst: PlannedInst::new(),
+            signal_strength: 0,
         }
     }
 
-    fn run(&mut self, inst: &Inst) {
-        match inst.0 {
-            Op::Addx => {
-                self.planned_inst
-                    .entry(self.tick + 2)
-                    .and_modify(|planned| planned.push(inst.clone()))
-                    .or_insert(vec![inst.clone()]);
+    fn run(&mut self, instructions: &Vec<Inst>) -> Vec<ClockCircuit> {
+        let mut states = Vec::<ClockCircuit>::new();
+        for instruction in instructions {
+            match instruction.0 {
+                Op::Addx => {
+                    self.tick += 1;
+                    states.push(self.to_state());
+                    self.tick += 1;
+                    states.push(self.to_state());
+                    self.reg_x += instruction.1.unwrap();
+                }
+                Op::Noop => {
+                    self.tick += 1;
+                    states.push(self.to_state());
+                }
             }
-            Op::Noop => {}
         }
 
-        if let Some(planned) = self.planned_inst.remove(&self.tick) {
-            self.reg_x += planned.iter().map(|i| i.1.unwrap()).sum::<V>();
-        }
-        self.tick += 1;
-    }
-
-    fn wait_tick(&mut self) -> bool {
-        if self.planned_inst.is_empty() {
-            return false;
-        }
-        if let Some(planned) = self.planned_inst.remove(&self.tick) {
-            self.reg_x += planned.iter().map(|i| i.1.unwrap()).sum::<V>();
-        }
-        self.tick += 1;
-        true
+        states
     }
 
     fn signal_strength(&self) -> SignalStrength {
         (self.tick as V) * self.reg_x
+    }
+
+    fn to_state(&self) -> ClockCircuit {
+        ClockCircuit {
+            tick: self.tick,
+            reg_x: self.reg_x,
+            signal_strength: self.signal_strength(),
+        }
+    }
+
+    fn calc_signal_strength(
+        &mut self,
+        instructions: &Vec<Inst>,
+        cycle_filter: fn(Tick) -> bool,
+    ) -> SignalStrength {
+        let mut signal_strength = 0;
+        for state in self.run(&instructions) {
+            if cycle_filter(state.tick) {
+                signal_strength += state.signal_strength;
+            }
+        }
+
+        signal_strength
     }
 }
 
@@ -275,46 +293,45 @@ noop";
     }
 
     #[test]
+    fn test_signal_strength_for_cycles() {
+        let instructions = instructions_from_puzzle_input(&test_content_2());
+        let mut circuit = ClockCircuit::new();
+        let cycle_filter = |tick| -> bool { tick == 20 || (tick - 20) % 40 == 0 };
+
+        let signal_strength = circuit.calc_signal_strength(&instructions, cycle_filter);
+
+        assert_eq!(signal_strength, 13140);
+    }
+
+    #[test]
     fn test_larger_clock_program() {
         let instructions = instructions_from_puzzle_input(&test_content_2());
-        let mut clock = ClockCircuit::new();
+        let mut circuit = ClockCircuit::new();
         let mut signal_strength: SignalStrength = 0;
-        for inst in instructions {
-            clock.run(&inst);
-            if clock.tick == 20 || (clock.tick - 20) % 40 == 0 {
-                println!("{clock:?}, {}", clock.signal_strength());
-                signal_strength += clock.signal_strength();
+        for state in circuit.run(&instructions) {
+            if state.tick == 20 || (state.tick - 20) % 40 == 0 {
+                println!("{state:?}");
+                signal_strength += state.signal_strength;
             }
         }
-        while clock.wait_tick() {
-            if clock.tick == 20 || (clock.tick - 20) % 40 == 0 {
-                println!("{clock:?}, {}", clock.signal_strength());
-                signal_strength += clock.signal_strength();
-            }
-        }
-
         assert_eq!(signal_strength, 13140);
     }
 
     #[test]
     fn test_simple_clock_program() {
         let instructions = instructions_from_puzzle_input(&test_content());
-        let mut clock = ClockCircuit::new();
-        for inst in instructions {
-            clock.run(&inst);
-        }
-        while clock.wait_tick() {}
-
-        assert_eq!(clock.reg_x, -1);
-        assert_eq!(clock.tick, 5);
+        let mut circuit = ClockCircuit::new();
+        let _ = circuit.run(&instructions);
+        assert_eq!(circuit.reg_x, -1);
+        assert_eq!(circuit.tick, 5);
     }
 
     #[test]
     fn test_noop_instruction() {
-        let mut clock = ClockCircuit::new();
-        clock.run(&Inst::noop());
-        assert_eq!(clock.tick, 1);
-        assert_eq!(clock.reg_x, 1);
+        let mut circuit = ClockCircuit::new();
+        circuit.run(&vec![Inst::noop()]);
+        assert_eq!(circuit.tick, 1);
+        assert_eq!(circuit.reg_x, 1);
     }
 
     #[test]
