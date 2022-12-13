@@ -12,14 +12,7 @@ pub fn run() {
 
 type WorryLevel = u64;
 type MonkeyId = u64;
-
-#[derive(Debug, PartialEq)]
-struct Monkey {
-    id: MonkeyId,
-    starting_items: Vec<WorryLevel>,
-    operation: fn(WorryLevel) -> WorryLevel,
-    test: fn(WorryLevel) -> MonkeyId,
-}
+type Count = usize;
 
 fn monkey_id_from(line: &str) -> MonkeyId {
     line.trim()
@@ -37,51 +30,70 @@ fn starting_items_from(line: &str) -> Vec<WorryLevel> {
         .collect::<Vec<WorryLevel>>()
 }
 
-/*
-enum Op {
-    Add,
-    Mul,
-}
-*/
+#[derive(Debug, PartialEq)]
+type Op = impl Fn(WorryLevel) -> WorryLevel;
 
-type Op = fn() -> WorryLevel;
+fn square_worry() -> Op {
+    move |worry| worry * worry
+}
+
+fn double_worry() -> Op {
+    move |worry| worry + worry
+}
+
+fn add_to_worry(value: WorryLevel) -> Op {
+    move |worry| worry + value
+}
+
+fn multiply_worry(value: WorryLevel) -> Op {
+    move |worry| worry * value
+}
 
 struct Operation {
     op: Op,
-    lval: WorryLevel,
-    rval: WorryLevel,
+    op_str: String,
+    rval_str: String,
 }
 
 impl Operation {
-    /*
-    fn new(op_char: char, lval: WorryLevel, rval: WorryLevel) -> Self {
-        let op = match op_char {
-            // '+' => Op::Add,
-            // '*' => Op::Mul,
-            '+' => || -> WorryLevel { lval + rval },
-            '*' => || -> WorryLevel { lval * rval },
-            _ => panic!("Unsupported operation char: {op_char}"),
+    fn new(op_str: &str, rval_str: &str) -> Self {
+        let op = match op_str {
+            "+" => match rval_str {
+                "old" => double_worry(),
+                _ => add_to_worry(rval_str.parse::<WorryLevel>().unwrap()),
+            },
+            "*" => match rval_str {
+                "old" => square_worry(),
+                _ => multiply_worry(rval_str.parse::<WorryLevel>().unwrap()),
+            },
+            _ => panic!("Unsupported operation char: {op_str}"),
         };
 
-        Self {
-            op: op,
-            lval: lval,
-            rval: rval,
-        }
+        Self { op: op, op_str: op_str.to_string(), rval_str: rval_str }
     }
-
-    fn apply(&self, worry_level: WorryLevel) -> WorryLevel {
-        0
-    }
-
-    fn f(&self, worry_level: WorryLevel) -> fn(WorryLevel) -> WorryLevel {
-        self.op
-    }
-    */
 }
 
-fn operation_from(line: &str) -> fn(WorryLevel) -> WorryLevel {
-    |worry| -> WorryLevel { 0 }
+fn operation_from(line: &str) -> Operation {
+    /*
+    let (op_str, rval_str, _) = line
+        .trim()
+        .trim_start_matches("Operation: new = old ")
+        .split(' ')
+        .collect::<Vec<&str>>();
+        */
+    let op_str = "*";
+    let rval_str = "old";
+    Operation::new(op_str, rval_str)
+}
+
+type Test = fn(WorryLevel) -> MonkeyId;
+
+struct Monkey {
+    id: MonkeyId,
+    starting_items: Vec<WorryLevel>,
+    operation: Operation,
+    test: Test,
+    inspection_count: Count,
 }
 
 fn monkey_from(lines: Vec<&str>) -> Monkey {
@@ -90,6 +102,7 @@ fn monkey_from(lines: Vec<&str>) -> Monkey {
         starting_items: starting_items_from(lines[1]),
         operation: operation_from(lines[2]),
         test: |worry| -> MonkeyId { 1 },
+        inspection_count: 0,
     }
 }
 
