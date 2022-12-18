@@ -1,5 +1,28 @@
 from aoc import input_fpath_for_day
-import json
+from itertools import zip_longest
+
+
+def _parse_line(line):
+    #  parsed = eval(line.strip())
+    parsed = list()
+    # Skip the first bracket
+    ix = 1
+    while ix < len(line):
+        ch = line[ix]
+        if ch.isnumeric():
+            parsed.append(int(ch))
+            ix += 1
+        elif ch == "[":
+            _ix, _parsed = _parse_line(line[ix:])
+            parsed.append(_parsed)
+            ix += _ix
+        elif ch == "]":
+            ix += 1
+            return ix, parsed
+        else:
+            ix += 1
+
+    return ix, parsed
 
 
 def parse_line(line):
@@ -8,8 +31,14 @@ def parse_line(line):
     [1, 1, 3, 1, 1]
     >>> parse_line("[]")
     []
+    >>> parse_line("[[]]")
+    [[]]
+    >>> parse_line("[1,[2,[3,[[[4,5]]],6]]]")
+    [1, [2, [3, [[[4, 5]]], 6]]]
+    >>> parse_line("[[[],[],[[]]]]")
+    [[[], [], [[]]]]
     """
-    parsed = eval(line.strip())
+    _, parsed = _parse_line(line)
     return parsed
 
 
@@ -57,36 +86,40 @@ def correct_order(packet_pair):
     >>> correct_order(([[1], [2], [[3]]], [[1], 2, [3]]))
     True
     """
+    return all(map(compare, zip(*packet_pair)))
+    #  return all(map(compare, zip_longest(*packet_pair)))
 
-    zipped = list(zip(*packet_pair))
-    diff = 0
-    ix = 0
-    for _ix in range(len(zipped)):
-        ix = _ix
-        left, right = zipped[_ix]
-        # If both values are integers, the lower integer should come first (be left)
-        if isinstance(left, int) and isinstance(right, int):
-            if left > right:
-                return False
-            # Keep track of the difference between the left and right values
-            diff += right - left
-        elif isinstance(left, list) and isinstance(right, list):
-            if not correct_order((left, right)):
-                return False
-        else:
-            left = left if isinstance(left, list) else [left]
-            right = right if isinstance(right, list) else [right]
-            if not correct_order((left, right)):
-                return False
-    left, right = packet_pair
-    # If the difference between left and right is greater than 0, the order is correct
-    # If the left packet is shorter or equal in length to the right packet, the order is correct
-    return diff > 0 or len(left[ix:]) <= len(right[ix:])
+
+def compare(ab):
+    """
+    >>> compare(([2, 3, 4], 4))
+    True
+    """
+    a, b = ab
+    if not a:
+        return True
+    if not b:
+        return False
+    if isinstance(a, list) and isinstance(b, list):
+        if not any(a):
+            return True
+        if not any(b):
+            return False
+        return all(map(compare, zip_longest(a, b, fillvalue=-1)))
+
+    if isinstance(a, int) and isinstance(b, int):
+        return a <= b
+
+    a = a if isinstance(a, list) else [a]
+    b = b if isinstance(b, list) else [b]
+    return compare(*zip(*(a, b)))
 
 
 def part_1(puzzle_input):
     packet_pairs = packet_pairs_from_puzzle_input(puzzle_input)
-    return sum(ix + 1 for ix, pair in enumerate(packet_pairs) if correct_order(pair))
+    return sum(
+        ix + 1 for ix, pair in enumerate(packet_pairs) if correct_order(pair)
+    )
 
 
 def part_2(puzzle_input):
@@ -119,7 +152,7 @@ if __name__ == "__main__":
 
 [1,[2,[3,[4,[5,6,7]]]],8,9]
 [1,[2,[3,[4,[5,6,0]]]],8,9]"""
-        #  content = f.read()
+        content = f.read()
         print("Day 13")
         print("Part 1:", part_1(content))
         print("Part 2:", part_2(content))
