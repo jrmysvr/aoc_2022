@@ -86,29 +86,50 @@ def correct_order(packet_pair):
     >>> correct_order(([[1], [2], [[3]]], [[1], 2, [3]]))
     True
     """
-    return all(map(compare, zip(*packet_pair)))
+    return all(map(gte_zero, map(compare, zip_longest(*packet_pair))))
+    #  return all(map(compare, zip(*packet_pair)))
     #  return all(map(compare, zip_longest(*packet_pair)))
+
+
+def gte_zero(thing):
+    return thing >= 0
 
 
 def compare(ab):
     """
     >>> compare(([2, 3, 4], 4))
-    True
+    1
+    >>> compare(([[]], []))
+    -1
+    >>> compare(([7], [7]))
+    0
     """
     a, b = ab
     if not a:
-        return True
+        return 1
     if not b:
-        return False
+        return -1
+
     if isinstance(a, list) and isinstance(b, list):
         if not any(a):
-            return True
+            return 1
         if not any(b):
-            return False
-        return all(map(compare, zip_longest(a, b, fillvalue=-1)))
+            return -1
+        if a < b:
+            return 1
+        if a == b:
+            return 0
+        return -1
+        # return all(map(gte_zero, map(compare, zip(a, b))))
 
     if isinstance(a, int) and isinstance(b, int):
-        return a <= b
+        print(a)
+        print(b)
+        if a < b:
+            return 1
+        elif a == b:
+            return 0
+        return -1
 
     a = a if isinstance(a, list) else [a]
     b = b if isinstance(b, list) else [b]
