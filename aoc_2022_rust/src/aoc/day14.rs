@@ -104,8 +104,7 @@ fn visualize_lines(multi_lines: Vec<Lines>) {
         }
     }
 
-    println!("{min_x}, {max_x}");
-    println!("{min_y}, {max_y}");
+    min_y = 0;
 
     let mut grid = Vec::<Vec<char>>::new();
     for ry in 0..=(max_y - min_y) {
